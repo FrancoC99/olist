@@ -1,0 +1,8 @@
+pandas
+numpy
+xgboost
+matplotlib
+scikit-learn
+plotly
+streamlit
+zipfile36
