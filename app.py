@@ -228,16 +228,16 @@ def show_section(section):
         st.header("Seller Analysis")
         selected_state = st.selectbox('Select a customer state', merged_df['customer_state_summary'].unique())
         selected_category = st.selectbox('Select a product category', merged_df['product_category_name_english_summary'].unique())
-        ranking_filter = st.radio('Select ranking filter', ['Top Best Sellers', 'Top Worst Sellers'])
+        ranking_filter = st.radio('Select ranking filter', ['Top Best 5 Sellers', 'Top Worst 5 Sellers'])
         if st.button('Go'):
             filtered_data = merged_df
             if selected_state:
                 filtered_data = filtered_data[filtered_data['customer_state_summary'] == selected_state]
             if selected_category:
                 filtered_data = filtered_data[filtered_data['product_category_name_english_summary'] == selected_category]
-            if ranking_filter == 'Top Best Sellers':
+            if ranking_filter == 'Top 5 Best Sellers':
                 filtered_data = filtered_data.nlargest(10, 'revenue_final')
-            elif ranking_filter == 'Top Worst Sellers':
+            elif ranking_filter == 'Top 5 Worst Sellers':
                 filtered_data = filtered_data.nsmallest(10, 'revenue_final')
 
             fig = px.scatter(
