@@ -259,60 +259,50 @@ def show_section(section):
             )
             st.plotly_chart(fig)
 
-    elif option == "Rating and Delivery Time":
-    st.header("Rating and Delivery Time Analysis", anchor="rating-and-delivery-time")
-    selected_metric = st.selectbox('Select metric', ['Delivery Time', 'Rating'])
+    elif section == "seller_analysis":
+        st.header("Seller Analysis", anchor="seller-analysis")
+        selected_state = st.selectbox('Select a customer state', merged_df['customer_state_summary'].unique())
+        selected_category = st.selectbox('Select a product category', merged_df['product_category_name_english_summary'].unique())
+        ranking_filter = st.radio('Select ranking filter', ['Top 10 Best Sellers', 'Top 10 Worst Sellers'])
+        if st.button('Go'):
+            filtered_data = merged_df
+            if selected_state:
+                filtered_data = filtered_data[filtered_data['customer_state_summary'] == selected_state]
+            if selected_category:
+                filtered_data = filtered_data[filtered_data['product_category_name_english_summary'] == selected_category]
+            if ranking_filter == 'Top 10 Best Sellers':
+                filtered_data = filtered_data.nlargest(10, 'revenue_final')
+            elif ranking_filter == 'Top 10 Worst Sellers':
+                filtered_data = filtered_data.nsmallest(10, 'revenue_final')
 
-    # Ensure columns exist and are numeric (using renamed column name)
-    for col in ['delivery_time', 'review_score']:
-        if col not in state_summary.columns or state_summary[col].dtype != 'float64':
-            st.error(f"Data issue: Column '{col}' missing or not numeric in state_summary.")
-            st.stop()
-
-    color_scale = 'Reds' if selected_metric == 'Delivery Time' else 'Blues'
-    color_label = f'Avg {selected_metric} (days)' if selected_metric == 'Delivery Time' else 'Avg Rating'
-
-    # Explicitly rename column to match what Plotly expects
-    state_summary = state_summary.rename(columns={
-        'customer_state': 'sigla', 
-        selected_metric.lower(): color_label  # Make this the exact label used in the plot
-    })
-
-    st.write("Data preview (after renaming):", state_summary[['sigla', color_label]].head())
-
-    # Create the GeoJSON URL
-    geojson_url = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
-
-    # Create the Plotly chart (use renamed columns)
-    fig = px.choropleth(
-        state_summary,
-        geojson=geojson_url,
-        locations='sigla',
-        featureidkey="properties.sigla",
-        color=color_label,
-        color_continuous_scale=color_scale,
-        labels={color_label: color_label},
-        hover_data={'delivery_time': True, 'review_score': True, 'sigla': False},
-        title=f'Average {color_label} by State'
-    )
-
-    fig.update_geos(fitbounds="locations", visible=False)
-    fig.update_layout(
-        margin={"r":0,"t":50,"l":0,"b":0},
-        clickmode='event+select',
-        autosize=True,
-        width=1000,
-        height=600,
-        coloraxis_colorbar=dict(
-            title=color_label,
-            thicknessmode="pixels", thickness=15,
-            lenmode="pixels", len=200,
-            yanchor="middle", y=0.5,
-            xanchor="left", x=-0.1
-        )
-    )
-
-    st.plotly_chart(fig)
+            fig = px.scatter(
+                filtered_data,
+                x='delivery_time_summary',
+                y='revenue_final',
+                size='avg_rating',
+                hover_name='seller_id',
+                title='Seller Analysis: Delivery Time vs. Revenue with Rating as Size',
+                labels={'delivery_time_summary': 'Avg Delivery Time', 'revenue_final': 'Revenue', 'avg_rating': 'Avg Rating'},
+                size_max=60
+            )
+            fig.update_traces(marker=dict(color=filtered_data['avg_rating'], colorscale='Plasma'))
+            fig.update_layout(
+                margin={"r":0,"t":50,"l":0,"b":0},
+                height=800,
+                width=1000
+            )
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=1.05, y=1,
+                showarrow=False,
+                text="Dot size represents average rating",
+                font=dict(
+                    size=12,
+                    color="black"
+                ),
+                align="left"
+            )
+            st.plotly_chart(fig)
 
             def get_top_n_unique(data, column, n=5):
                 return data.drop_duplicates(subset=['seller_id']).nlargest(n, column)[['seller_id', column]]
