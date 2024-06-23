@@ -228,7 +228,7 @@ def show_section(section):
         st.header("Seller Analysis")
         selected_state = st.selectbox('Select a customer state', merged_df['customer_state_summary'].unique())
         selected_category = st.selectbox('Select a product category', merged_df['product_category_name_english_summary'].unique())
-        ranking_filter = st.radio('Select ranking filter', ['Top Best 5 Sellers', 'Top Worst 5 Sellers'])
+        ranking_filter = st.radio('Select ranking filter', ['Top 5 Best Sellers', 'Top 5 Worst Sellers'])
         if st.button('Go'):
             filtered_data = merged_df
             if selected_state:
