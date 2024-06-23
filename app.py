@@ -228,16 +228,16 @@ def show_section(section):
         st.header("Seller Analysis")
         selected_state = st.selectbox('Select a customer state', merged_df['customer_state_summary'].unique())
         selected_category = st.selectbox('Select a product category', merged_df['product_category_name_english_summary'].unique())
-        ranking_filter = st.radio('Select ranking filter', ['Top 5 Best Sellers', 'Top 5 Worst Sellers'])
+        ranking_filter = st.radio('Select ranking filter', ['Top Best Sellers', 'Top Worst Sellers'])
         if st.button('Go'):
             filtered_data = merged_df
             if selected_state:
                 filtered_data = filtered_data[filtered_data['customer_state_summary'] == selected_state]
             if selected_category:
                 filtered_data = filtered_data[filtered_data['product_category_name_english_summary'] == selected_category]
-            if ranking_filter == 'Top 5 Best Sellers':
+            if ranking_filter == 'Top Best Sellers':
                 filtered_data = filtered_data.nlargest(10, 'revenue_final')
-            elif ranking_filter == 'Top 5 Worst Sellers':
+            elif ranking_filter == 'Top Worst Sellers':
                 filtered_data = filtered_data.nsmallest(10, 'revenue_final')
 
             fig = px.scatter(
@@ -282,13 +282,13 @@ def show_section(section):
             )
             top_sellers_overall = get_top_n_unique(filtered_data, 'overall_score')
 
-            st.subheader("Top 5 by Revenue")
+            st.subheader("Top Sellers by Revenue")
             st.write(top_sellers_revenue)
-            st.subheader("Top 5 by Delivery Time")
+            st.subheader("Top Sellers by Delivery Time")
             st.write(top_sellers_delivery_time)
-            st.subheader("Top 5 by Rating")
+            st.subheader("Top Sellers by Rating")
             st.write(top_sellers_rating)
-            st.subheader("Top 5 Overall")
+            st.subheader("Top Sellers Overall")
             st.write(top_sellers_overall)
 
     elif section == "Seller Power and Conversion Rates":
