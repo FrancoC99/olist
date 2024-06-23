@@ -196,22 +196,6 @@ def show_section(section):
             # Verificación adicional de los datos
             st.write("Data passed to px.choropleth:", state_summary[['customer_state', metric_column]].head())
             
-            fig = px.choropleth(
-                state_summary,
-                geojson="https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson",
-                locations='customer_state',
-                featureidkey="properties.sigla",
-                hover_name='customer_state',
-                color=metric_column,
-                color_continuous_scale=color_scale,
-                labels={metric_column: color_label},
-                hover_data={
-                    'delivery_time': True,
-                    'review_score': True,
-                    'customer_state': False
-                },
-                title=f'Average {color_label} by State'
-            )
             fig.update_geos(fitbounds="locations", visible=False)
             fig.update_layout(
                 margin={"r":0,"t":50,"l":0,"b":0},
