@@ -114,104 +114,218 @@ def analyze_orders(selection_type, state=None, category=None):
     st.write(f'Root Mean Square Error (RMSE): {rmse}')
 
     start_date = test['order_purchase_timestamp'].min() - timedelta(days=30)
-    plot_data = prepared_df[(prepared_df['order_purchase_timestamp'] >= start_date) & (prepared_df['order_purchase_timestamp'] <= test['order_purchase_timestamp'].max())].copy()
-    plot_data.set_index('order_purchase_timestamp', inplace=True)
+    plot_data = prepared_df[(prepared_df['order_purchase_timestamp'] >= start_date) & (prepared_df['order_purchase_timestamp'] <= test['order_purchase_timestamp'].max())]
 
-    plt.figure(figsize=(14, 7))
-    plt.plot(plot_data.index, plot_data['demand'], label='Actual Demand', color='blue')
-    plt.plot(test['order_purchase_timestamp'], preds, label='Predicted Demand', color='red')
-    plt.fill_between(test['order_purchase_timestamp'], lower_bounds, upper_bounds, color='gray', alpha=0.3, label='Confidence Interval')
-    plt.legend()
-    plt.xlabel('Date')
-    plt.ylabel('Demand')
-    plt.title('Demand Forecast')
-    st.pyplot(plt)
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.plot(plot_data['order_purchase_timestamp'], plot_data['demand'], label='Historical')
+    ax.plot(test['order_purchase_timestamp'], y_test, label='Test')
+    ax.plot(test['order_purchase_timestamp'], preds, label='Forecast')
+    ax.fill_between(test['order_purchase_timestamp'], lower_bounds, upper_bounds, color='gray', alpha=0.2, label='95% Prediction Interval')
+    ax.legend()
+    st.pyplot(fig)
+
+    results = test[['order_purchase_timestamp']].copy()
+    results['forecast'] = preds
+    results['lower_bound'] = lower_bounds
+    results['upper_bound'] = upper_bounds
+    results_filtered = results[results['order_purchase_timestamp'] >= start_date]
+
+    st.write(results_filtered)
 
 # Streamlit App
-st.title("Olist Data Analysis")
 
-section = st.sidebar.radio("Go to", ("Welcome", "Demand Forecast", "Rating and Delivery Time", "Seller Analysis", "Seller Power and Conversion Rates"))
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+section = st.sidebar.radio("Go to", ["Welcome", "Demand Forecast", "Rating and Delivery Time", "Seller Analysis", "Seller Power and Conversion Rates"], index=0)
 
-if section == "Welcome":
-    st.header("Welcome")
-    st.write("""
-    Welcome to the Olist Data Analysis dashboard. Use the sidebar to navigate between different sections of the analysis.
-    """)
-
-elif section == "Rating and Delivery Time":
-    st.header("Rating and Delivery Time Analysis")
-    selected_metric = st.selectbox('Select metric', ['Delivery Time', 'Rating'])
-    
-    # Check for required columns and non-null values
-    if 'customer_state' not in state_summary.columns or 'delivery_time' not in state_summary.columns or 'review_score' not in state_summary.columns:
-        st.error("Required columns are missing from the state_summary dataframe.")
-    elif state_summary[['customer_state', 'delivery_time', 'review_score']].isnull().any().any():
-        st.error("There are null values in the required columns of the state_summary dataframe.")
-    else:
-        if selected_metric == 'Delivery Time':
-            metric_column = 'delivery_time'
-            color_scale = 'Reds'
-            color_label = 'Avg Delivery Time (days)'
-        else:
-            metric_column = 'review_score'
-            color_scale = 'Blues'
-            color_label = 'Avg Rating'
+# Show selected section
+def show_section(section):
+    if section == "Welcome":
+        st.markdown("<h1 style='text-align: center;'>Welcome to Olist Consulting</h1>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style='text-align: center;'>
+                <a href='https://olist.com/' target='_blank'>
+                    <img src='https://miro.medium.com/v2/resize:fit:860/1*axbXtRXw9pgn1QA9HVkQVA.png' alt='Olist' style='width:300px;'>
+                </a>
+                <p style='text-align: center;'>End-to-end solutions for selling online without headaches</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    elif section == "Demand Forecast":
+        st.header("Demand Forecast Analysis")
+        state = st.selectbox('Select a customer state', df['customer_state'].unique())
+        category = st.selectbox('Select a product category', df['product_category_name_english'].unique())
+        forecast_option = st.radio('Forecast Option', ['Only by Category', 'Only by State', 'By Both State and Category'], index=1)
         
-        # Debugging output
-        st.write("Data preview:", state_summary.head())
-        st.write("GeoJSON URL is valid and accessible.")
+        # Map forecast_option to selection_type
+        if forecast_option == 'Only by Category':
+            selection_type = 'category'
+        elif forecast_option == 'Only by State':
+            selection_type = 'state'
+        elif forecast_option == 'By Both State and Category':
+            selection_type = 'both'
 
-        fig = px.choropleth(
-            state_summary,
-            geojson="https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson",
-            locations='customer_state',
-            featureidkey="properties.sigla",
-            hover_name='customer_state',
-            color=metric_column,
-            color_continuous_scale=color_scale,
-            labels={metric_column: color_label},
-            hover_data={
-                'delivery_time': True,
-                'review_score': True,
-                'customer_state': False
-            },
-            title=f'Average {color_label} by State'
-        )
-        fig.update_geos(fitbounds="locations", visible=False)
-        fig.update_layout(
-            margin={"r":0,"t":50,"l":0,"b":0},
-            clickmode='event+select',
-            autosize=True,
-            width=1000,
-            height=600,
-            coloraxis_colorbar=dict(
-                title=color_label,
-                thicknessmode="pixels", thickness=15,
-                lenmode="pixels", len=200,
-                yanchor="middle", y=0.5,
-                xanchor="left", x=-0.1
+        if st.button('Go'):
+            analyze_orders(selection_type, state, category)
+
+    elif section == "Rating and Delivery Time":
+        st.header("Rating and Delivery Time Analysis")
+        selected_metric = st.selectbox('Select metric', ['Delivery Time', 'Rating'])
+        
+        # Check for required columns and non-null values
+        if 'customer_state' not in state_summary.columns or 'delivery_time' not in state_summary.columns or 'review_score' not in state_summary.columns:
+            st.error("Required columns are missing from the state_summary dataframe.")
+        elif state_summary[['customer_state', 'delivery_time', 'review_score']].isnull().any().any():
+            st.error("There are null values in the required columns of the state_summary dataframe.")
+        else:
+            if selected_metric == 'Delivery Time':
+                metric_column = 'delivery_time'
+                color_scale = 'Reds'
+                color_label = 'Avg Delivery Time (days)'
+            else:
+                metric_column = 'review_score'
+                color_scale = 'Blues'
+                color_label = 'Avg Rating'
+            
+            # Debugging output
+            st.write("Data preview:", state_summary.head())
+            st.write("GeoJSON URL is valid and accessible.")
+
+            # Verificación adicional de los datos
+            st.write("Data passed to px.choropleth:", state_summary[['customer_state', metric_column]].head())
+            
+            fig = px.choropleth(
+                state_summary,
+                geojson="https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson",
+                locations='customer_state',
+                featureidkey="properties.sigla",
+                hover_name='customer_state',
+                color=metric_column,
+                color_continuous_scale=color_scale,
+                labels={metric_column: color_label},
+                hover_data={
+                    'delivery_time': True,
+                    'review_score': True,
+                    'customer_state': False
+                },
+                title=f'Average {color_label} by State'
             )
-        )
-        st.plotly_chart(fig)
+            fig.update_geos(fitbounds="locations", visible=False)
+            fig.update_layout(
+                margin={"r":0,"t":50,"l":0,"b":0},
+                clickmode='event+select',
+                autosize=True,
+                width=1000,
+                height=600,
+                coloraxis_colorbar=dict(
+                    title=color_label,
+                    thicknessmode="pixels", thickness=15,
+                    lenmode="pixels", len=200,
+                    yanchor="middle", y=0.5,
+                    xanchor="left", x=-0.1
+                )
+            )
+            st.plotly_chart(fig)
 
-elif section == "Seller Analysis":
-    st.header("Seller Analysis")
-    st.write("Seller analysis content goes here...")
+    elif section == "Seller Analysis":
+        st.header("Seller Analysis")
+        selected_state = st.selectbox('Select a customer state', merged_df['customer_state_summary'].unique())
+        selected_category = st.selectbox('Select a product category', merged_df['product_category_name_english_summary'].unique())
+        ranking_filter = st.radio('Select ranking filter', ['Top 10 Best Sellers', 'Top 10 Worst Sellers'])
+        if st.button('Go'):
+            filtered_data = merged_df
+            if selected_state:
+                filtered_data = filtered_data[filtered_data['customer_state_summary'] == selected_state]
+            if selected_category:
+                filtered_data = filtered_data[filtered_data['product_category_name_english_summary'] == selected_category]
+            if ranking_filter == 'Top 10 Best Sellers':
+                filtered_data = filtered_data.nlargest(10, 'revenue_final')
+            elif ranking_filter == 'Top 10 Worst Sellers':
+                filtered_data = filtered_data.nsmallest(10, 'revenue_final')
 
-elif section == "Seller Power and Conversion Rates":
-    st.header("Seller Power and Conversion Rates")
-    st.write(high_power_categories)
+            fig = px.scatter(
+                filtered_data,
+                x='delivery_time_summary',
+                y='revenue_final',
+                size='avg_rating',
+                hover_name='seller_id',
+                title='Seller Analysis: Delivery Time vs. Revenue with Rating as Size',
+                labels={'delivery_time_summary': 'Avg Delivery Time', 'revenue_final': 'Revenue', 'avg_rating': 'Avg Rating'},
+                size_max=60
+            )
+            fig.update_traces(marker=dict(color=filtered_data['avg_rating'], colorscale='Plasma'))
+            fig.update_layout(
+                margin={"r":0,"t":50,"l":0,"b":0},
+                height=800,
+                width=1000
+            )
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=1.05, y=1,
+                showarrow=False,
+                text="Dot size represents average rating",
+                font=dict(
+                    size=12,
+                    color="black"
+                ),
+                align="left"
+            )
+            st.plotly_chart(fig)
 
-elif section == "Demand Forecast":
-    st.header("Demand Forecast Analysis")
+            def get_top_n_unique(data, column, n=5):
+                return data.drop_duplicates(subset=['seller_id']).nlargest(n, column)[['seller_id', column]]
 
-    selection_type = st.selectbox('Select analysis type', ['state', 'category', 'both'])
-    selected_state = None
-    selected_category = None
+            top_sellers_revenue = get_top_n_unique(filtered_data, 'revenue_final')
+            top_sellers_delivery_time = get_top_n_unique(filtered_data, 'delivery_time_summary')
+            top_sellers_rating = get_top_n_unique(filtered_data, 'avg_rating')
+            filtered_data['overall_score'] = (
+                (filtered_data['revenue_final'].rank(ascending=False) +
+                filtered_data['delivery_time_summary'].rank(ascending=True) +
+                filtered_data['avg_rating'].rank(ascending=False)) / 3
+            )
+            top_sellers_overall = get_top_n_unique(filtered_data, 'overall_score')
 
-    if selection_type in ['state', 'both']:
-        selected_state = st.selectbox('Select state', df['customer_state'].unique())
-    if selection_type in ['category', 'both']:
-        selected_category = st.selectbox('Select category', df['product_category_name_english'].unique())
+            st.subheader("Top 5 by Revenue")
+            st.write(top_sellers_revenue)
+            st.subheader("Top 5 by Delivery Time")
+            st.write(top_sellers_delivery_time)
+            st.subheader("Top 5 by Rating")
+            st.write(top_sellers_rating)
+            st.subheader("Top 5 Overall")
+            st.write(top_sellers_overall)
 
-    analyze_orders(selection_type, selected_state, selected_category)
+    elif section == "Seller Power and Conversion Rates":
+        st.header("Seller Power and Conversion Rates")
+        num_top_categories = st.selectbox('Select number of top categories', [5, 10, 15, 20], index=1)
+        selected_segment = st.selectbox('Select a business segment', conversion_data['business_segment'].unique())
+        if st.button('Analyze'):
+            top_categories = category_analysis.sort_values(by='avg_sales_per_seller', ascending=False).head(num_top_categories)
+            fig1 = px.bar(
+                top_categories,
+                x='product_category_name_english',
+                y='avg_sales_per_seller',
+                title=f'Top {num_top_categories} Categories with Highest Seller Power',
+                labels={'avg_sales_per_seller': 'Average Sales per Seller'},
+                color='avg_sales_per_seller',
+                color_continuous_scale='Viridis'
+            )
+            fig1.add_hline(y=high_power_threshold, line_dash="dash", line_color="red", annotation_text="High Power Threshold")
+            st.plotly_chart(fig1)
+
+            if selected_segment:
+                filtered_data = conversion_data[conversion_data['business_segment'] == selected_segment]
+                fig2 = px.bar(
+                    filtered_data,
+                    x='origin',
+                    y='conversion_rate',
+                    title=f'Conversion Rates for Business Segment: {selected_segment}',
+                    labels={'conversion_rate': 'Conversion Rate'},
+                    color='conversion_rate',
+                    color_continuous_scale='Blues'
+                )
+                st.plotly_chart(fig2)
+
+# Show the section
+show_section(section)
