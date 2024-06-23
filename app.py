@@ -146,7 +146,7 @@ def show_section(section):
             """
             <div style='text-align: center;'>
                 <a href='https://olist.com/' target='_blank'>
-                    <img src='https://miro.medium.com/v2/resize:fit:860/1*axbXtRXw9pgn1QA9HVkQVA.png' alt='Olist' style='width:300px;'>
+                    <img src='https://techcrunch.com/wp-content/uploads/2021/04/Olist-HQ-in-Brazil-1.jpg' alt='Olist' style='width:300px;'>
                 </a>
                 <p style='text-align: center;'>End-to-end solutions for selling online without headaches</p>
             </div>
