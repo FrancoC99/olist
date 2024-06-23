@@ -35,16 +35,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Helper function to extract and load CSVs from zip files
-def load_csv_from_zip(zip_path, file_name):
-    if not os.path.exists(zip_path):
-        st.error(f"{zip_path} does not exist.")
-        st.stop()
-    with zipfile.ZipFile(zip_path, 'r') as z:
-        if file_name not in z.namelist():
-            st.error(f"{file_name} not found in the zip file.")
-            st.stop()
-        with z.open(file_name) as f:
-            return pd.read_csv(f)
+# ... (código anterior)
 
 # Load datasets
 @st.cache_data
@@ -81,81 +72,7 @@ conversion_data = pd.merge(closed_deals_by_origin_segment, qualified_leads_by_or
 conversion_data['conversion_rate'] = conversion_data['closed_deals_count'] / conversion_data['qualified_leads_count']
 
 # Demand Forecast Analysis
-def prepare_data(data, selection_type, customer_state=None, product_category=None):
-    if selection_type == 'state':
-        df = data[data['customer_state'] == customer_state].copy()
-    elif selection_type == 'category':
-        df = data[data['product_category_name_english'] == product_category].copy()
-    elif selection_type == 'both':
-        df = data[(data['customer_state'] == customer_state) & (data['product_category_name_english'] == product_category)].copy()
-    else:
-        raise ValueError("Invalid selection_type. Choose from 'state', 'category', or 'both'.")
-    
-    df = df.set_index('order_purchase_timestamp').resample('D').size().reset_index(name='demand')
-    return df
-
-def analyze_orders(selection_type, state=None, category=None):
-    df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
-    cutoff_date = pd.to_datetime('2018-07-31')
-    df_filtered = df[df['order_purchase_timestamp'] <= cutoff_date]
-
-    prepared_df = prepare_data(df_filtered, selection_type, state, category)
-    prepared_df = prepared_df.sort_values('order_purchase_timestamp')
-
-    train = prepared_df.iloc[:-21].copy()
-    test = prepared_df.iloc[-21:].copy()
-
-    def create_features(df):
-        df = df.copy()
-        df['day_of_week'] = df['order_purchase_timestamp'].dt.dayofweek
-        df['day_of_month'] = df['order_purchase_timestamp'].dt.day
-        df['week_of_year'] = df['order_purchase_timestamp'].dt.isocalendar().week
-        df['month'] = df['order_purchase_timestamp'].dt.month
-        return df
-
-    train = create_features(train)
-    test = create_features(test)
-
-    X_train = train.drop(['order_purchase_timestamp', 'demand'], axis=1)
-    y_train = train['demand']
-    X_test = test.drop(['order_purchase_timestamp', 'demand'], axis=1)
-    y_test = test['demand']
-
-    model = xgb.XGBRegressor(objective='reg:squarederror')
-    model.fit(X_train, y_train)
-    preds = model.predict(X_test)
-
-    def calculate_intervals(predictions, alpha=0.05):
-        errors = y_train - model.predict(X_train)
-        error_std = np.std(errors)
-        interval_range = error_std * 1.96
-        lower_bounds = predictions - interval_range
-        upper_bounds = predictions + interval_range
-        return lower_bounds, upper_bounds
-
-    lower_bounds, upper_bounds = calculate_intervals(preds)
-
-    rmse = np.sqrt(mean_squared_error(y_test, preds))
-    st.write(f'Root Mean Square Error (RMSE): {rmse}')
-
-    start_date = test['order_purchase_timestamp'].min() - timedelta(days=30)
-    plot_data = prepared_df[(prepared_df['order_purchase_timestamp'] >= start_date) & (prepared_df['order_purchase_timestamp'] <= test['order_purchase_timestamp'].max())]
-
-    fig, ax = plt.subplots(figsize=(14, 7))
-    ax.plot(plot_data['order_purchase_timestamp'], plot_data['demand'], label='Historical')
-    ax.plot(test['order_purchase_timestamp'], y_test, label='Test')
-    ax.plot(test['order_purchase_timestamp'], preds, label='Forecast')
-    ax.fill_between(test['order_purchase_timestamp'], lower_bounds, upper_bounds, color='gray', alpha=0.2, label='95% Prediction Interval')
-    ax.legend()
-    st.pyplot(fig)
-
-    results = test[['order_purchase_timestamp']].copy()
-    results['forecast'] = preds
-    results['lower_bound'] = lower_bounds
-    results['upper_bound'] = upper_bounds
-    results_filtered = results[results['order_purchase_timestamp'] >= start_date]
-
-    st.write(results_filtered)
+# ... (resto del código de análisis de la demanda)
 
 # Streamlit App
 st.title("Olist Consulting Dashboard")
@@ -224,40 +141,43 @@ def show_section(section):
             st.write("GeoJSON URL is valid and accessible.")
 
             # Verificación adicional de los datos
-            st.write("Data passed to px.choropleth:", state_summary[['customer_state', selected_metric.lower()]].head())
-            
-            fig = px.choropleth(
-                state_summary,
-                geojson="https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson",
-                locations='customer_state',
-                featureidkey="properties.sigla",
-                hover_name='customer_state',
-                color=selected_metric.lower(),
-                color_continuous_scale=color_scale,
-                labels={selected_metric.lower(): color_label},
-                hover_data={
-                    'delivery_time': True,
-                    'review_score': True,
-                    'customer_state': False
-                },
-                title=f'Average {color_label} by State'
-            )
-            fig.update_geos(fitbounds="locations", visible=False)
-            fig.update_layout(
-                margin={"r":0,"t":50,"l":0,"b":0},
-                clickmode='event+select',
-                autosize=True,
-                width=1000,
-                height=600,
-                coloraxis_colorbar=dict(
-                    title=color_label,
-                    thicknessmode="pixels", thickness=15,
-                    lenmode="pixels", len=200,
-                    yanchor="middle", y=0.5,
-                    xanchor="left", x=-0.1
+            if selected_metric.lower() not in state_summary.columns:
+                st.error(f"Column {selected_metric.lower()} does not exist in state_summary.")
+            else:
+                st.write("Data passed to px.choropleth:", state_summary[['customer_state', selected_metric.lower()]].head())
+                
+                fig = px.choropleth(
+                    state_summary,
+                    geojson="https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson",
+                    locations='customer_state',
+                    featureidkey="properties.sigla",
+                    hover_name='customer_state',
+                    color=selected_metric.lower(),
+                    color_continuous_scale=color_scale,
+                    labels={selected_metric.lower(): color_label},
+                    hover_data={
+                        'delivery_time': True,
+                        'review_score': True,
+                        'customer_state': False
+                    },
+                    title=f'Average {color_label} by State'
                 )
-            )
-            st.plotly_chart(fig)
+                fig.update_geos(fitbounds="locations", visible=False)
+                fig.update_layout(
+                    margin={"r":0,"t":50,"l":0,"b":0},
+                    clickmode='event+select',
+                    autosize=True,
+                    width=1000,
+                    height=600,
+                    coloraxis_colorbar=dict(
+                        title=color_label,
+                        thicknessmode="pixels", thickness=15,
+                        lenmode="pixels", len=200,
+                        yanchor="middle", y=0.5,
+                        xanchor="left", x=-0.1
+                    )
+                )
+                st.plotly_chart(fig)
 
     elif section == "seller_analysis":
         st.header("Seller Analysis", anchor="seller-analysis")
@@ -278,84 +198,18 @@ def show_section(section):
             fig = px.scatter(
                 filtered_data,
                 x='delivery_time_summary',
-                y='revenue_final',
-                size='avg_rating',
-                hover_name='seller_id',
-                title='Seller Analysis: Delivery Time vs. Revenue with Rating as Size',
-                labels={'delivery_time_summary': 'Avg Delivery Time', 'revenue_final': 'Revenue', 'avg_rating': 'Avg Rating'},
-                size_max=60
-            )
-            fig.update_traces(marker=dict(color=filtered_data['avg_rating'], colorscale='Plasma'))
-            fig.update_layout(
-                margin={"r":0,"t":50,"l":0,"b":0},
-                height=800,
-                width=1000
-            )
-            fig.add_annotation(
-                xref="paper", yref="paper",
-                x=1.05, y=1,
-                showarrow=False,
-                text="Dot size represents average rating",
-                font=dict(
-                    size=12,
-                    color="black"
-                ),
-                align="left"
+                y='review_score_summary',
+                size='revenue_final',
+                color='revenue_final',
+                hover_name='seller_id_summary',
+                labels={'delivery_time_summary': 'Delivery Time (days)', 'review_score_summary': 'Review Score', 'revenue_final': 'Revenue'},
+                title='Seller Analysis'
             )
             st.plotly_chart(fig)
 
-            def get_top_n_unique(data, column, n=5):
-                return data.drop_duplicates(subset=['seller_id']).nlargest(n, column)[['seller_id', column]]
-
-            top_sellers_revenue = get_top_n_unique(filtered_data, 'revenue_final')
-            top_sellers_delivery_time = get_top_n_unique(filtered_data, 'delivery_time_summary')
-            top_sellers_rating = get_top_n_unique(filtered_data, 'avg_rating')
-            filtered_data['overall_score'] = (
-                (filtered_data['revenue_final'].rank(ascending=False) +
-                filtered_data['delivery_time_summary'].rank(ascending=True) +
-                filtered_data['avg_rating'].rank(ascending=False)) / 3
-            )
-            top_sellers_overall = get_top_n_unique(filtered_data, 'overall_score')
-
-            st.subheader("Top 5 by Revenue")
-            st.write(top_sellers_revenue)
-            st.subheader("Top 5 by Delivery Time")
-            st.write(top_sellers_delivery_time)
-            st.subheader("Top 5 by Rating")
-            st.write(top_sellers_rating)
-            st.subheader("Top 5 Overall")
-            st.write(top_sellers_overall)
-
     elif section == "seller_power_and_conversion_rates":
-        st.header("Seller Power and Conversion Rates", anchor="seller-power-and-conversion-rates")
-        num_top_categories = st.selectbox('Select number of top categories', [5, 10, 15, 20], index=1)
-        selected_segment = st.selectbox('Select a business segment', conversion_data['business_segment'].unique())
-        if st.button('Analyze'):
-            top_categories = category_analysis.sort_values(by='avg_sales_per_seller', ascending=False).head(num_top_categories)
-            fig1 = px.bar(
-                top_categories,
-                x='product_category_name_english',
-                y='avg_sales_per_seller',
-                title=f'Top {num_top_categories} Categories with Highest Seller Power',
-                labels={'avg_sales_per_seller': 'Average Sales per Seller'},
-                color='avg_sales_per_seller',
-                color_continuous_scale='Viridis'
-            )
-            fig1.add_hline(y=high_power_threshold, line_dash="dash", line_color="red", annotation_text="High Power Threshold")
-            st.plotly_chart(fig1)
+        st.header("Seller Power and Conversion Rates Analysis", anchor="seller-power-and-conversion-rates")
+        st.dataframe(high_power_categories)
+        st.dataframe(conversion_data)
 
-            if selected_segment:
-                filtered_data = conversion_data[conversion_data['business_segment'] == selected_segment]
-                fig2 = px.bar(
-                    filtered_data,
-                    x='origin',
-                    y='conversion_rate',
-                    title=f'Conversion Rates for Business Segment: {selected_segment}',
-                    labels={'conversion_rate': 'Conversion Rate'},
-                    color='conversion_rate',
-                    color_continuous_scale='Blues'
-                )
-                st.plotly_chart(fig2)
-
-# Mostrar la sección seleccionada
 show_section(default_section)
